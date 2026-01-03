@@ -80,6 +80,9 @@ CFLAGS += -mcmodel=medany
 CFLAGS += -ffreestanding -fno-common -nostdlib -mno-relax
 CFLAGS += -I.
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
+# 自动注入当前时间作为系统启动时间
+CFLAGS += -DSYSTEM_START_YEAR=$(shell date +%Y) -DSYSTEM_START_MONTH=$(shell date +%m) -DSYSTEM_START_DAY=$(shell date +%d)
+CFLAGS += -DSYSTEM_START_HOUR=$(shell date +%H) -DSYSTEM_START_MIN=$(shell date +%M) -DSYSTEM_START_SEC=$(shell date +%S)
 
 ifeq ($(mode), debug) 
 CFLAGS += -DDEBUG 
@@ -230,10 +233,10 @@ fs: $(UPROGS)
 		mkfs.vfat -F 32 fs.img; fi
 	@sudo mount fs.img $(dst)
 	@if [ ! -d "$(dst)/bin" ]; then sudo mkdir $(dst)/bin; fi
-	@sudo cp README $(dst)/README
+	@sudo cp README $(dst)/README && sudo touch -r README $(dst)/README
 	@for file in $$( ls $U/_* ); do \
-		sudo cp $$file $(dst)/$${file#$U/_};\
-		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
+		sudo cp $$file $(dst)/$${file#$U/_} && sudo touch -r $$file $(dst)/$${file#$U/_};\
+		sudo cp $$file $(dst)/bin/$${file#$U/_} && sudo touch -r $$file $(dst)/bin/$${file#$U/_}; done
 	@sudo umount $(dst)
 
 # Write mounted sdcard
@@ -243,7 +246,8 @@ sdcard: userprogs
 		sudo cp $$file $(dst)/bin/$${file#$U/_}; done
 	@sudo cp $U/_init $(dst)/init
 	@sudo cp $U/_sh $(dst)/sh
-	@sudo cp README $(dst)/README
+	@sudo cp README $(dst)/README && sudo touch -r README $(dst)/README
+
 
 clean: 
 	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
@@ -254,3 +258,10 @@ clean:
 	.gdbinit \
 	$U/usys.S \
 	$(UPROGS)
+
+# 清理文件系统镜像
+cleanfs:
+	rm -f fs.img
+
+# 清理所有文件，包括文件系统镜像
+cleanall: clean cleanfs
